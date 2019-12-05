@@ -316,6 +316,7 @@ public class HttpRequestUtils {
         BufferedReader in = null;  
         try {  
             String wwwAuth = sendGet(url, param);       //发起一次授权请求
+            System.out.println("一次授权请求: " + wwwAuth);
             if (wwwAuth.startsWith("WWW-Authenticate:")) {  
                 wwwAuth = wwwAuth.replaceFirst("WWW-Authenticate:", "");  
             } else {  
@@ -338,7 +339,8 @@ public class HttpRequestUtils {
             nc = 0;
         } catch (Exception e) {  
             nc = 0;  
-            throw new RuntimeException(e);  
+            e.printStackTrace();
+            //throw new RuntimeException(e);  
         } finally {  
             try {  
                 if (in != null) in.close();  
@@ -361,11 +363,11 @@ public class HttpRequestUtils {
   
         uri = StringUtils.isEmpty(uri) ? "/" : uri;  
         // String temp = authorization.replaceFirst("Digest", "").trim();
-        String temp = authorization.replaceFirst("Digest", "").trim().replace("MD5","\"MD5\"");
+        String temp = authorization.replaceFirst("Digest", "").trim();
         // String json = "{\"" + temp.replaceAll("=", "\":").replaceAll(",", ",\"") + "}";
         String json = withdrawJson(authorization);
         // String json = "{ \"realm\": \"Wowza\", \" domain\": \"/\", \" nonce\": \"MTU1NzgxMTU1NzQ4MDo2NzI3MWYxZTZkYjBiMjQ2ZGRjYTQ3ZjNiOTM2YjJjZA==\", \" algorithm\": \"MD5\", \" qop\": \"auth\" }";
-
+        System.out.println("json: " + json);
         JSONObject jsonObject = JSON.parseObject(json);  
         // String cnonce = new String(Hex.encodeHex(Digests.generateSalt(8)));    //客户端随机数
         String cnonce = Digests.generateSalt2(8);
@@ -381,11 +383,12 @@ public class HttpRequestUtils {
                 method, uri, algorithm);
   
         //组成响应authorization  
-        authorization = "Digest username=\"" + username + "\"," + temp;  
-        authorization += ",uri=\"" + uri  
-                + "\",nc=\"" + ncstr  
-                + "\",cnonce=\"" + cnonce  
-                + "\",response=\"" + response+"\"";  
+        authorization = "Digest username=\"" + username + "\", " + temp;  
+        authorization += ", uri=\"" + uri  
+                + "\", nc=" + ncstr  
+                + ", cnonce=\"" + cnonce  
+                + "\", response=\"" + response+"\"";  
+        System.out.println("authorization: " + authorization);
         return authorization;  
     }
 
@@ -395,15 +398,14 @@ public class HttpRequestUtils {
      * @return                                                  返回authrization json格式数据 如：String json = "{ \"realm\": \"Wowza\", \" domain\": \"/\", \" nonce\": \"MTU1NzgxMTU1NzQ4MDo2NzI3MWYxZTZkYjBiMjQ2ZGRjYTQ3ZjNiOTM2YjJjZA==\", \" algorithm\": \"MD5\", \" qop\": \"auth\" }";
      */
     private static String withdrawJson(String authorization) {
-        String temp = authorization.replaceFirst("Digest", "").trim().replaceAll("\"","");
+        String temp = authorization.replaceFirst("Digest", "").replaceAll("(\")","").trim();
         // String noncetemp = temp.substring(temp.indexOf("nonce="), temp.indexOf("uri="));
         // String json = "{\"" + temp.replaceAll("=", "\":").replaceAll(",", ",\"") + "}";
+        System.out.println(temp);
         String[] split = temp.split(",");
         Map<String, String> map = new HashMap<>();
         Arrays.asList(split).forEach(c -> {
-            String c1 = c.replaceFirst("=",":");
-            String[] split1 = c1.split(":");
-            map.put(split1[0].trim(), split1[1].trim());
+            map.put(c.substring(0, c.indexOf("=")).trim(), c.substring(c.indexOf("="), c.length()).replace("=", ""));
         });
         return JSONObject.toJSONString(map);
     }
@@ -435,7 +437,11 @@ public class HttpRequestUtils {
             //此情况返回服务器的 WWW-Authenticate 信息  
             if (((HttpURLConnection) connection).getResponseCode() == 401) {  
                 Map<String, List<String>> map = connection.getHeaderFields();  
-                return "WWW-Authenticate:" + map.get("WWW-Authenticate").get(0);  
+                System.out.println(map);
+                System.out.println("第一次请求获得的WWW-Authenticate:");
+                List<String> list = map.get("WWW-Authenticate");
+                list.forEach(System.out::println);
+                return "WWW-Authenticate:" + (list.get(1).length() > list.get(0).length() ? list.get(1) : list.get(0));  
             }  
   
             in = new BufferedReader(new InputStreamReader(connection.getInputStream()));  
